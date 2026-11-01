@@ -14,12 +14,13 @@
 
 @Library('ci-labs@v1.0.0') _
 
-// Report one status to GitHub. A reporting error is logged, not fatal: a missing required
-// status still blocks the merge, so this fails safe.
+// Report one status to GitHub (githubNotify: plugin "Pipeline: GitHub Notify Step").
+// A reporting error is logged, not fatal: a missing required status still blocks the
+// merge, so this fails safe. Throwable also covers a missing plugin (NoSuchMethodError).
 def notify(String context, String state, String description) {
   try {
     githubNotify(context: context, status: state, description: description, sha: env.GIT_COMMIT)
-  } catch (err) {
+  } catch (Throwable err) {
     echo "WARNING: could not report ${context}=${state} to GitHub: ${err.message}"
   }
 }
