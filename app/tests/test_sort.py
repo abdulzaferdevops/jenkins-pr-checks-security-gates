@@ -24,3 +24,9 @@ def test_sort_by_name(client):
 def test_sort_by_quantity(client):
     ids = [i["id"] for i in client.get("/api/items?sort=quantity").get_json()["items"]]
     assert ids == [1, 2, 3]
+
+
+def test_unknown_sort_field_is_rejected(client):
+    resp = client.get("/api/items?sort=__class__")
+    assert resp.status_code == 400
+    assert "sort must be one of" in resp.get_json()["message"]
