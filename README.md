@@ -50,6 +50,8 @@ five always run, so one pull request shows every problem at once rather than one
 - **The pull request head is built, and branch protection requires it to be up to date with
   `main`.** That gives the same guarantee as building a merge commit, and the statuses land on
   a commit GitHub knows.
+- **Statuses go straight to the GitHub REST API** (`POST /repos/{repo}/statuses/{sha}`) with the
+  job's own fine-grained token, so no extra Jenkins plugin is needed.
 - **Reporting fails safe.** If Jenkins cannot post a status, the required check is missing
   and GitHub still blocks the merge.
 - **A new push cancels the previous run** for the same pull request
@@ -68,12 +70,18 @@ five always run, so one pull request shows every problem at once rather than one
 
 ## Results
 
-| Pull request | Change | Gates |
-|:--|:--|:--|
-| [FILL: #] | `?sort=` implemented with `eval` | [FILL] |
-| [FILL: #] | fixed with an allow-list | [FILL] |
-| [FILL: #] | API key committed in `config.py` | [FILL] |
-| [FILL: #] | `urllib3==1.26.4` added | [FILL] |
+| Change | Commit | Gates | Outcome |
+|:--|:--|:--|:--|
+| `?sort=` built with `eval` | `c30a298` | `ci/sast` ❌ bandit B307 (CWE-78); tests ✅ 14 passed, 100% coverage | Merge blocked: the unsafe code passed every test |
+| Fixed with an allow-list, plus a test for `?sort=__class__` → 400 | `0b91d7c` | all five ✅, 15 tests | PR #1 merged |
+| API key committed in `app/config.py` | `6218fb7` | `ci/secrets` ❌ gitleaks `generic-api-key`, value redacted in the log | Blocked |
+| Key deleted in a follow-up commit | `3ecdc91` | `ci/secrets` still ❌: the key is in history (`6218fb7`) | Branch deleted unmerged; in real life, rotate the key |
+| `urllib3==1.26.4` added | `2008f67` | `ci/dependencies` ❌ Trivy: **8 HIGH** CVEs (CVE-2021-33503 … ) | Blocked; the table gives the fixed version |
+| Upgraded to `urllib3==2.8.0` | `fe9901e` | all five ✅ | Merged |
+
+Direct pushes to `main` are rejected (`GH006: Protected branch update failed … 5 of 5 required status
+checks are expected`), including for the repository owner. This README change itself went in
+through a pull request.
 
 ## Licence
 
