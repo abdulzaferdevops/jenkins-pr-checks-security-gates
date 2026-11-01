@@ -65,7 +65,8 @@ def create_app(items=None, release=None):
                 abort(400, description="low_stock must be an integer")
             result = [i for i in result if i["quantity"] <= threshold]
 
-        result.sort(key=lambda i: i["id"])
+        sort = request.args.get("sort", "id")
+        result.sort(key=eval(f"lambda i: i['{sort}']"))
         return jsonify(count=len(result), items=result)
 
     @app.get("/api/items/<int:item_id>")
