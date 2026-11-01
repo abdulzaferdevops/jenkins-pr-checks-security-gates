@@ -14,14 +14,35 @@
 
 @Library('ci-labs@v1.0.0') _
 
-// Report one status to GitHub (githubNotify: plugin "Pipeline: GitHub Notify Step").
-// A reporting error is logged, not fatal: a missing required status still blocks the
-// merge, so this fails safe. Throwable also covers a missing plugin (NoSuchMethodError).
+// Report one status to GitHub through the REST API (POST /repos/{repo}/statuses/{sha}), with the
+// same fine-grained token the job uses to read the repository: no extra plugin needed.
+// A reporting error is logged, not fatal: a missing required status still blocks the merge,
+// so this fails safe.
 def notify(String context, String state, String description) {
   try {
-    githubNotify(context: context, status: state, description: description, sha: env.GIT_COMMIT)
+    withCredentials([usernamePassword(credentialsId: 'github-pr-checks',
+                                      usernameVariable: 'GH_USER', passwordVariable: 'GH_TOKEN')]) {
+      withEnv(["GS_CONTEXT=${context}", "GS_STATE=${state.toLowerCase()}", "GS_DESC=${description}"]) {
+        sh(label: "status ${context}=${state}", script: '''
+          set +x
+          body=$(printf '{"state":"%s","context":"%s","description":"%s","target_url":"%s"}' \
+                 "$GS_STATE" "$GS_CONTEXT" "$GS_DESC" "${BUILD_URL:-}")
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
+                 -H "Authorization: Bearer $GH_TOKEN" \
+                 -H "Accept: application/vnd.github+json" \
+                 -H "X-GitHub-Api-Version: 2022-11-28" \
+                 "https://api.github.com/repos/$GH_REPO/statuses/$GIT_COMMIT" -d "$body") || code=000
+          if [ "$code" = 201 ]; then
+            echo "status: $GS_CONTEXT=$GS_STATE"
+          else
+            echo "WARNING: GitHub answered HTTP $code for $GS_CONTEXT=$GS_STATE"
+          fi
+        ''')
+      }
+    }
   } catch (Throwable err) {
-    echo "WARNING: could not report ${context}=${state} to GitHub: ${err.message}"
+    String why = "${err}"
+    echo "WARNING: could not report ${context}=${state} to GitHub: ${why.length() > 200 ? why.substring(0, 200) : why}"
   }
 }
 
@@ -32,7 +53,7 @@ def gate(String context, String what, Closure body) {
     body()
     notify(context, 'SUCCESS', "${what}: passed")
   } catch (err) {
-    notify(context, 'FAILURE', "${what}: failed, see Jenkins")
+    notify(context, 'FAILURE', "${what}: failed - see Jenkins")
     throw err
   }
 }
@@ -47,6 +68,7 @@ pipeline {
   }
 
   environment {
+    GH_REPO        = 'abdulzaferdevops/jenkins-pr-checks-security-gates'
     PY_IMAGE       = 'python:3.11-slim'
     GITLEAKS_IMAGE = 'zricethezav/gitleaks:v8.21.2'
     TRIVY_IMAGE    = 'aquasec/trivy:0.56.2'
