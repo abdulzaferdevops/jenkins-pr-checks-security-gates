@@ -1,0 +1,18 @@
+# Reports written by the gates
+reports/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+.venv/
+
+# Never commit keys, secrets or environment files
+*.pem
+*.key
+id_*
+ci-lab
+ci-lab.pub
+.env
+*.token
