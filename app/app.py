@@ -11,6 +11,7 @@ from flask import Flask, abort, jsonify, request
 BASE_DIR = Path(__file__).resolve().parent
 DATA_FILE = BASE_DIR / "data" / "items.json"
 RELEASE_FILE = BASE_DIR / "RELEASE"
+SORT_FIELDS = ("id", "name", "quantity")
 
 
 def load_items(path=DATA_FILE):
@@ -65,7 +66,10 @@ def create_app(items=None, release=None):
                 abort(400, description="low_stock must be an integer")
             result = [i for i in result if i["quantity"] <= threshold]
 
-        result.sort(key=lambda i: i["id"])
+        sort = request.args.get("sort", "id")
+        if sort not in SORT_FIELDS:
+            abort(400, description="sort must be one of: " + ", ".join(SORT_FIELDS))
+        result.sort(key=lambda i: i[sort])
         return jsonify(count=len(result), items=result)
 
     @app.get("/api/items/<int:item_id>")
